@@ -4,13 +4,15 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
+LOCAL_MODEL = "ollama/gemma2" # or use None to use Azure LLM
+
 # AWS LLM Configuration
 AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
 AWS_SESSION_TOKEN = os.getenv("AWS_SESSION_TOKEN")
 AWS_DEFAULT_REGION = os.getenv("AWS_DEFAULT_REGION")
 
-MODEL_NAME = "anthropic.claude-3-haiku-20240307-v1:0"
+# MODEL_NAME = "anthropic.claude-3-haiku-20240307-v1:0"
 #MODEL_NAME = "anthropic.claude-3-5-sonnet-20240620-v1:0"
 
 # Azure LLM Configuration
