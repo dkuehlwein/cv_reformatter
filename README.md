@@ -9,6 +9,10 @@ CV Reformatter is a web application that helps users reformat their CVs (Curricu
 - Preview reformatted CV with markdown rendering
 - Copy reformatted CV to clipboard or download as a markdown file
 - Responsive design for various screen sizes
+- Use locally on a laptop with ollama models
+   - best results with gemma2 (compared to mistral, phi3, llama3.2)
+   - use from command line
+   - save to .docx
 
 ## Project Structure
 
@@ -81,6 +85,31 @@ The project is divided into two main parts:
 5. (Optional) Upload an example CV using the template with the "Upload Example" input.
 6. Click the "Reformat CV" button to process your CV.
 7. Once processed, you can view the reformatted CV, copy it to your clipboard, or download it as a markdown file.
+
+### Local Usage
+
+Currently, only Ollama is supported.
+
+Set the specific model in the config file or to None.
+The model name must match the offical name including version numbers.
+
+
+```python
+# backend/config.py
+LOCAL_MODEL = "ollama/gemma2" # or use None to use Azure LLM
+```
+
+### Command Line
+
+--top_directory: The top directory where the input files are located.
+--cv_file: Name of the CV file.
+--template_file: Name of the template file.
+--example_file: Name of the example file (optional).
+
+Example Usage:
+```sh
+python app.py --top_directory path/to/top_directory --cv_file cv.docx --template_file template.docx --example_file example.docx
+```
 
 ## Development
 

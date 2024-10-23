@@ -5,51 +5,16 @@ from langchain_ollama import OllamaLLM
 
 from parse_docx import extract_text_from_docx
 from prompt_template import create_prompt
-# import config
 from config import LOCAL_MODEL
+
+from utils.formatting import save_text
+from utils.command_line import generate_output_filename, get_filenames
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-"""
-def load_aws():
-    import boto3
-    from langchain_aws import ChatBedrock
-    #MODEL_NAME = "anthropic.claude-3-haiku-20240307-v1:0"  # or any other model you prefer
-    MODEL_NAME = "anthropic.claude-3-5-sonnet-20240620-v1:0"
-
-    logging.debug("Creating boto3 session")
-    session = boto3.Session(
-        aws_access_key_id=AWS_ACCESS_KEY_ID,
-        aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-        aws_session_token=AWS_SESSION_TOKEN,  # Include this for temporary credentials
-        region_name=AWS_DEFAULT_REGION
-    )
-
-    logging.debug("Creating ChatBedrock instance")
-    llm = ChatBedrock(
-        model_id=MODEL_NAME,
-        model_kwargs=dict(temperature=0),
-        client=session.client("bedrock-runtime")
-    )
-    return llm
-#"""
-
 def load_llm():
-    if LOCAL_MODEL == "ollama":
-
-        # Initialize the Ollama model
-        llm = OllamaLLM(
-            model="mistral",  # Replace with the actual model name you want to use
-            api_key=None,  # Replace with your actual API key
-            temperature=0,
-            max_tokens=None,
-            timeout=None,
-            max_retries=2,
-        )
-        logging.info("Using Ollama model: mistral")
-        return llm
-    else:
+    if LOCAL_MODEL is None:
         from langchain_openai import AzureChatOpenAI
         deployment = "gpt-4o-mini"
         llm = AzureChatOpenAI(
@@ -62,44 +27,55 @@ def load_llm():
         )
         logging.info(f"Using {deployment}")
         return llm
+    
+    elif "ollama" in LOCAL_MODEL:
+        # Initialize the Ollama model
+        model_name = LOCAL_MODEL.split('/')[1]
+        llm = OllamaLLM(
+            model=model_name,  # Replace with the actual model name you want to use
+            api_key=None,  # No API key needed for local models
+            temperature=0,
+            max_tokens=None,
+            timeout=None,
+            max_retries=2,
+        )
+        logging.info(f"Using Ollama model: {model_name}")
+        return llm
 
-
-
-def reformat_cv_with_llm(cv_file: str, template_file: str, example_file: str) -> str:
+def reformat_cv_with_llm(cv_file: str, template_file: str, example_file: str = None) -> str:
     """
     Reformat the CV content according to the given template using LangChain.
     """
-
-    """
-    cv_content=extract_text_from_docx("data/cv.docx")
-    template_content=extract_text_from_docx("data/template.docx")
-    example_content = extract_text_from_docx("data/example.docx")
-    #"""
-    logging.info("Extracting text from CV file")
-    cv_content = extract_text_from_docx(cv_file)
-    logging.debug(f"CV content extracted: {cv_content[:100]}...")
-
-    logging.info("Extracting text from template file")
-    template_content = extract_text_from_docx(template_file)
-    logging.debug(f"Template content extracted: {template_content[:100]}...")
-
-    logging.info("Extracting text from example file")
-    example_content = extract_text_from_docx(example_file)
-    logging.debug(f"Example content extracted: {example_content[:100]}...")
-
-    logging.debug("Loading LLM")
     llm = load_llm()
 
-    logging.info("Creating prompt")
+    cv_content = extract_text_from_docx(cv_file)
+    template_content = extract_text_from_docx(template_file)
+    example_content = extract_text_from_docx(example_file) if example_file else ""
+
+    # Create the prompt
     prompt = create_prompt(cv_content, template_content, example_content)
-    logging.debug(f"Prompt created: {prompt[:100]}...")
 
-    logging.info("Invoking LLM with prompt")
-    result = llm.invoke(prompt)
+    # Use the llm to generate the reformatted CV content
+    response = llm.generate([prompt])  # Wrap the prompt in a list
+    
+    # Assuming the response has a 'generations' attribute that contains the generated text
+    if hasattr(response, 'generations') and response.generations:
+        # Extract text from the first generation
+        generated_text = response.generations[0][0].text
+        return generated_text
+    else:
+        raise ValueError("Unexpected response structure: 'generations' attribute not found or empty")
 
-    logging.info("Parsing LLM result")
-    parser = StrOutputParser()
-    result = parser.invoke(result)
-    logging.debug(f"Parsed result: {result[:100]}...")
 
-    return result
+def main():
+    top_directory, cv_file, template_file, example_file = get_filenames()
+    reformatted_cv = reformat_cv_with_llm(cv_file, template_file, example_file)
+    output_filename = generate_output_filename(top_directory, cv_file, template_file, example_file)
+    
+    # Save the reformatted CV to a .docx file
+    save_text(reformatted_cv, output_filename)    
+    print(f"Reformatted CV saved to {output_filename}")
+
+
+if __name__ == "__main__":
+    main()
