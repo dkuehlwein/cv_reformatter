@@ -1,10 +1,12 @@
 import logging
 
 from langchain_core.output_parsers import StrOutputParser
+from langchain_ollama import OllamaLLM
 
 from parse_docx import extract_text_from_docx
 from prompt_template import create_prompt
-import config
+# import config
+from config import LOCAL_MODEL
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -34,18 +36,32 @@ def load_aws():
 #"""
 
 def load_llm():
-    from langchain_openai import AzureChatOpenAI
-    deployment = "gpt-4o-mini"
-    llm = AzureChatOpenAI(
-        azure_deployment=deployment,  # or your deployment
-        api_version="2024-08-01-preview",  # or your api version
-        temperature=0,
-        max_tokens=None,
-        timeout=None,
-        max_retries=2,
-    )
-    logging.info(f"Using {deployment}")
-    return llm
+    if LOCAL_MODEL == "ollama":
+
+        # Initialize the Ollama model
+        llm = OllamaLLM(
+            model="mistral",  # Replace with the actual model name you want to use
+            api_key=None,  # Replace with your actual API key
+            temperature=0,
+            max_tokens=None,
+            timeout=None,
+            max_retries=2,
+        )
+        logging.info("Using Ollama model: mistral")
+        return llm
+    else:
+        from langchain_openai import AzureChatOpenAI
+        deployment = "gpt-4o-mini"
+        llm = AzureChatOpenAI(
+            azure_deployment=deployment,  # or your deployment
+            api_version="2024-08-01-preview",  # or your api version
+            temperature=0,
+            max_tokens=None,
+            timeout=None,
+            max_retries=2,
+        )
+        logging.info(f"Using {deployment}")
+        return llm
 
 
 

@@ -2,3 +2,7 @@
 /.venv
 /.vscode
 /.env
+__pycache__/
+*.pyc
+check_*.py
+/frontend/node_modules
