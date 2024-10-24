@@ -1,44 +1,21 @@
+# cv_reformatter.py
 import logging
-
+from typing import Optional
+from werkzeug.datastructures import FileStorage
 from langchain_core.output_parsers import StrOutputParser
-
-from parse_docx import extract_text_from_docx
+from parse_docx import convert_to_markdown
 from prompt_template import create_prompt
 import config
 
-# Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-"""
-def load_aws():
-    import boto3
-    from langchain_aws import ChatBedrock
-    #MODEL_NAME = "anthropic.claude-3-haiku-20240307-v1:0"  # or any other model you prefer
-    MODEL_NAME = "anthropic.claude-3-5-sonnet-20240620-v1:0"
-
-    logging.debug("Creating boto3 session")
-    session = boto3.Session(
-        aws_access_key_id=AWS_ACCESS_KEY_ID,
-        aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
-        aws_session_token=AWS_SESSION_TOKEN,  # Include this for temporary credentials
-        region_name=AWS_DEFAULT_REGION
-    )
-
-    logging.debug("Creating ChatBedrock instance")
-    llm = ChatBedrock(
-        model_id=MODEL_NAME,
-        model_kwargs=dict(temperature=0),
-        client=session.client("bedrock-runtime")
-    )
-    return llm
-#"""
 
 def load_llm():
     from langchain_openai import AzureChatOpenAI
     deployment = "gpt-4o-mini"
     llm = AzureChatOpenAI(
-        azure_deployment=deployment,  # or your deployment
-        api_version="2024-08-01-preview",  # or your api version
+        azure_deployment=deployment,
+        api_version="2024-08-01-preview",
         temperature=0,
         max_tokens=None,
         timeout=None,
@@ -48,42 +25,66 @@ def load_llm():
     return llm
 
 
+def safe_convert_to_markdown(file: Optional[FileStorage]) -> str:
+    """Safely convert a file to markdown, handling None case."""
+    if file is None:
+        return ""
+    try:
+        return convert_to_markdown(file)
+    except Exception as e:
+        logging.error(f"Error converting file {file.filename if file else 'None'} to markdown: {e}")
+        raise ValueError(f"Error processing file {file.filename if file else 'None'}: {str(e)}")
 
-def reformat_cv_with_llm(cv_file: str, template_file: str, example_file: str) -> str:
+
+def reformat_cv_with_llm(
+        cv_file: FileStorage,
+        template_file: FileStorage,
+        example_file: Optional[FileStorage] = None
+) -> str:
     """
     Reformat the CV content according to the given template using LangChain.
+
+    Args:
+        cv_file: The CV file to reformat (required)
+        template_file: The template file to use (required)
+        example_file: An optional example file
+
+    Returns:
+        Reformatted CV content as string
     """
+    try:
+        logging.info("Extracting text from CV file")
+        cv_content = safe_convert_to_markdown(cv_file)
+        logging.debug(f"CV content extracted: {cv_content[:100]}...")
 
-    """
-    cv_content=extract_text_from_docx("data/cv.docx")
-    template_content=extract_text_from_docx("data/template.docx")
-    example_content = extract_text_from_docx("data/example.docx")
-    #"""
-    logging.info("Extracting text from CV file")
-    cv_content = extract_text_from_docx(cv_file)
-    logging.debug(f"CV content extracted: {cv_content[:100]}...")
+        logging.info("Extracting text from template file")
+        template_content = safe_convert_to_markdown(template_file)
+        logging.debug(f"Template content extracted: {template_content[:100]}...")
 
-    logging.info("Extracting text from template file")
-    template_content = extract_text_from_docx(template_file)
-    logging.debug(f"Template content extracted: {template_content[:100]}...")
+        # Handle optional example file
+        example_content = ""
+        if example_file:
+            logging.info("Extracting text from example file")
+            example_content = safe_convert_to_markdown(example_file)
+            logging.debug(f"Example content extracted: {example_content[:100]}...")
 
-    logging.info("Extracting text from example file")
-    example_content = extract_text_from_docx(example_file)
-    logging.debug(f"Example content extracted: {example_content[:100]}...")
+        logging.debug("Loading LLM")
+        llm = load_llm()
 
-    logging.debug("Loading LLM")
-    llm = load_llm()
+        logging.info("Creating prompt")
+        prompt = create_prompt(cv_content, template_content, example_content)
+        logging.debug(f"Prompt created: {prompt[:100]}...")
 
-    logging.info("Creating prompt")
-    prompt = create_prompt(cv_content, template_content, example_content)
-    logging.debug(f"Prompt created: {prompt[:100]}...")
+        logging.info("Invoking LLM with prompt")
+        result = llm.invoke(prompt)
 
-    logging.info("Invoking LLM with prompt")
-    result = llm.invoke(prompt)
+        logging.info("Parsing LLM result")
+        parser = StrOutputParser()
+        result = parser.invoke(result)
+        logging.debug(f"Parsed result: {result[:100]}...")
 
-    logging.info("Parsing LLM result")
-    parser = StrOutputParser()
-    result = parser.invoke(result)
-    logging.debug(f"Parsed result: {result[:100]}...")
+        return result
 
-    return result
+    except Exception as e:
+        logging.error(f"Error in reformat_cv_with_llm: {str(e)}")
+        raise
